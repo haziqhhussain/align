@@ -1,0 +1,176 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #F5F7FB;
+    --surface: #FFFFFF;
+    --surface-elevated: #FFFFFF;
+    --surface-active: #EEF2FF;
+
+    --text-primary: #111827;
+    --text-secondary: #6B7280;
+    --text-muted: #9CA3AF;
+
+    --primary: #6366F1;
+    --primary-hover: #4F46E5;
+    --secondary-accent: #7C83FD;
+
+    --border: #E5E7EB;
+
+    /* Light Mode Depth Shadows */
+    --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
+    --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+    --shadow-md: 0 4px 10px rgba(16, 24, 40, 0.08);
+    --shadow-lg: 0 10px 24px rgba(16, 24, 40, 0.10);
+    --btn-shadow: 0 2px 6px rgba(99, 102, 241, 0.20);
+    --btn-shadow-hover: 0 4px 10px rgba(99, 102, 241, 0.28);
+    --sidebar-shadow: 1px 0 6px rgba(16, 24, 40, 0.03);
+    --navbar-shadow: 0 1px 4px rgba(16, 24, 40, 0.04);
+  }
+
+  .dark {
+    --background: #121212;
+    --surface: #1E1E1E;
+    --surface-elevated: #242424;
+    --surface-active: #2F2F2F;
+
+    --text-primary: #FFFFFF;
+    --text-secondary: #D1D5DB;
+    --text-muted: #9CA3AF;
+
+    --primary: #60A5FA;
+    --primary-hover: #3B82F6;
+    --secondary-accent: #3B82F6;
+
+    --border: #343434;
+
+    /* Dark Mode Shadows (Neutral / None) */
+    --shadow-xs: none;
+    --shadow-sm: none;
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.50);
+    --btn-shadow: none;
+    --btn-shadow-hover: none;
+    --sidebar-shadow: none;
+    --navbar-shadow: none;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+}
+
+/* Custom Minimal Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Card & Panel Primitives */
+.saas-card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem; /* 12px radius */
+  box-shadow: var(--shadow-sm);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+html:not(.dark) .saas-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.saas-panel {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow 180ms ease;
+}
+
+/* Navbar & Sidebar Depth in Light Mode */
+html:not(.dark) header {
+  box-shadow: var(--navbar-shadow);
+}
+
+html:not(.dark) aside {
+  box-shadow: var(--sidebar-shadow);
+}
+
+/* Primary Action Buttons Depth in Light Mode */
+html:not(.dark) .bg-theme-primary {
+  box-shadow: var(--btn-shadow);
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+
+html:not(.dark) .bg-theme-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--btn-shadow-hover);
+}
+
+html:not(.dark) .bg-theme-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(99, 102, 241, 0.20);
+}
+
+/* Input Focus Glow in Light Mode */
+html:not(.dark) input:focus,
+html:not(.dark) select:focus,
+html:not(.dark) textarea:focus {
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+/* Status Badges */
+.badge-todo {
+  background-color: var(--surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.badge-in-progress {
+  background-color: var(--surface-active);
+  color: var(--primary);
+  border: 1px solid var(--border);
+}
+
+.badge-review {
+  background-color: rgba(217, 119, 6, 0.08);
+  color: #d97706;
+  border: 1px solid rgba(217, 119, 6, 0.2);
+}
+
+.dark .badge-review {
+  background-color: rgba(245, 158, 11, 0.12);
+  color: #fcd34d;
+  border-color: rgba(252, 211, 77, 0.25);
+}
+
+.badge-completed {
+  background-color: rgba(16, 185, 129, 0.08);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.dark .badge-completed {
+  background-color: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.25);
+}
