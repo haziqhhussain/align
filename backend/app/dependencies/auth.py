@@ -64,11 +64,34 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
         )
     return current_user
 
+def is_user_team_owner(user: User, team_id: int, db: Session) -> bool:
+    if user.role == UserRole.ADMIN:
+        return True
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        return False
+    if team.owner_id == user.id:
+        return True
+    member = db.query(TeamMember).filter(
+        TeamMember.team_id == team_id,
+        TeamMember.user_id == user.id,
+        TeamMember.role == "OWNER"
+    ).first()
+    return member is not None
+
 def is_user_team_lead(user: User, team_id: int, db: Session) -> bool:
     if user.role == UserRole.ADMIN:
         return True
     team = db.query(Team).filter(Team.id == team_id).first()
-    if team and team.lead_id == user.id:
+    if not team:
+        return False
+    if team.owner_id == user.id or team.lead_id == user.id:
+        return True
+    member = db.query(TeamMember).filter(
+        TeamMember.team_id == team_id,
+        TeamMember.user_id == user.id
+    ).first()
+    if member and member.role in ["OWNER", "LEAD"]:
         return True
     return False
 
@@ -78,7 +101,7 @@ def is_user_team_member(user: User, team_id: int, db: Session) -> bool:
     team = db.query(Team).filter(Team.id == team_id).first()
     if not team:
         return False
-    if team.lead_id == user.id:
+    if team.owner_id == user.id or team.lead_id == user.id:
         return True
     member = db.query(TeamMember).filter(
         TeamMember.team_id == team_id,
@@ -90,12 +113,12 @@ def require_team_lead_for_team(team_id: int, user: User, db: Session):
     if not is_user_team_lead(user, team_id, db):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not authorized as a Team Lead or Admin for this team"
+            detail="You are not authorized as a Team Lead or Owner for this team"
         )
 
 def require_team_member_for_team(team_id: int, user: User, db: Session):
     if not is_user_team_member(user, team_id, db):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not a member or lead of this team"
+            detail="You are not a member, lead, or owner of this team"
         )

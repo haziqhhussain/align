@@ -11,12 +11,19 @@ from app.models.task import Task, TaskPriority, TaskStatus
 from app.models.notification import Notification
 from app.schemas.task import TaskCreate, TaskUpdate, TaskStatusUpdate, TaskResponse
 from app.dependencies.auth import get_current_user, is_user_team_lead, is_user_team_member
+from app.services.notification_service import create_notification
+from app.services.activity_service import log_activity
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
 def format_task_response(task: Task) -> dict:
     now = datetime.utcnow()
     is_overdue = bool(task.due_date and task.due_date < now and task.status != TaskStatus.COMPLETED)
+
+    subtasks = sorted(task.subtasks or [], key=lambda s: s.position)
+    subtask_count = len(subtasks)
+    completed_subtask_count = sum(1 for st in subtasks if st.is_completed)
+    subtask_progress = int(round((completed_subtask_count / subtask_count) * 100)) if subtask_count > 0 else 0
 
     return {
         "id": task.id,
@@ -33,10 +40,14 @@ def format_task_response(task: Task) -> dict:
         "created_at": task.created_at,
         "updated_at": task.updated_at,
         "is_overdue": is_overdue,
+        "subtask_count": subtask_count,
+        "completed_subtask_count": completed_subtask_count,
+        "subtask_progress": subtask_progress,
         "project": task.project,
         "assigned_to": task.assigned_to,
         "created_by": task.created_by,
-        "comments": task.comments
+        "comments": task.comments,
+        "subtasks": subtasks
     }
 
 @router.get("", response_model=List[TaskResponse])
@@ -109,7 +120,7 @@ def create_task(
     if not is_user_team_lead(current_user, project.team_id, db):
         raise HTTPException(status_code=403, detail="Only Admin or Team Lead can create tasks in this project")
 
-    # Verify assigned user is member of team if provided
+    assigned_user = None
     if task_in.assigned_to_id:
         assigned_user = db.query(User).filter(User.id == task_in.assigned_to_id).first()
         if not assigned_user:
@@ -133,16 +144,45 @@ def create_task(
     db.commit()
     db.refresh(task)
 
-    # Send Notification to assigned member
+    # Activity Log
+    log_activity(
+        db=db,
+        actor_id=current_user.id,
+        action_type="TASK_CREATED",
+        entity_type="TASK",
+        entity_id=task.id,
+        team_id=project.team_id,
+        project_id=project.id,
+        task_id=task.id,
+        description=f"{current_user.full_name} created task \"{task.title}\"."
+    )
+
+    # Send Notification and Assignment Activity to assigned member
     if task_in.assigned_to_id and task_in.assigned_to_id != current_user.id:
-        notif = Notification(
+        create_notification(
+            db=db,
             user_id=task_in.assigned_to_id,
+            type="TASK_ASSIGNED",
             title="New Task Assigned",
             message=f"You were assigned to task '{task.title}' by {current_user.full_name}.",
-            link=f"/tasks?id={task.id}"
+            related_entity_type="TASK",
+            related_entity_id=task.id,
+            action_url=f"/tasks?id={task.id}"
         )
-        db.add(notif)
-        db.commit()
+        assignee_name = assigned_user.full_name if assigned_user else f"User #{task_in.assigned_to_id}"
+        log_activity(
+            db=db,
+            actor_id=current_user.id,
+            action_type="TASK_ASSIGNED",
+            entity_type="TASK",
+            entity_id=task.id,
+            team_id=project.team_id,
+            project_id=project.id,
+            task_id=task.id,
+            target_user_id=task_in.assigned_to_id,
+            description=f"{current_user.full_name} assigned \"{task.title}\" to {assignee_name}.",
+            metadata={"new_assignee_id": task_in.assigned_to_id}
+        )
 
     return format_task_response(task)
 
@@ -177,6 +217,9 @@ def update_task(
         raise HTTPException(status_code=403, detail="Only Admin or Team Lead can edit task details")
 
     old_assigned_id = task.assigned_to_id
+    old_status = task.status
+    old_priority = task.priority
+    old_due_date = task.due_date
 
     if task_in.title is not None:
         task.title = task_in.title
@@ -205,16 +248,111 @@ def update_task(
     db.commit()
     db.refresh(task)
 
+    team_id = task.project.team_id
+    project_id = task.project_id
+
+    # Check assignment change
+    if task_in.assigned_to_id is not None and task_in.assigned_to_id != old_assigned_id:
+        new_user = db.query(User).filter(User.id == task_in.assigned_to_id).first()
+        old_user = db.query(User).filter(User.id == old_assigned_id).first() if old_assigned_id else None
+        new_name = new_user.full_name if new_user else f"User #{task_in.assigned_to_id}"
+        old_name = old_user.full_name if old_user else None
+
+        if old_name:
+            action_type = "TASK_REASSIGNED"
+            desc = f"{current_user.full_name} reassigned \"{task.title}\" from {old_name} to {new_name}."
+        else:
+            action_type = "TASK_ASSIGNED"
+            desc = f"{current_user.full_name} assigned \"{task.title}\" to {new_name}."
+
+        log_activity(
+            db=db,
+            actor_id=current_user.id,
+            action_type=action_type,
+            entity_type="TASK",
+            entity_id=task.id,
+            team_id=team_id,
+            project_id=project_id,
+            task_id=task.id,
+            target_user_id=task_in.assigned_to_id,
+            description=desc,
+            metadata={"old_assignee_id": old_assigned_id, "new_assignee_id": task_in.assigned_to_id}
+        )
+
+    # Check status change
+    if task_in.status is not None and task_in.status != old_status:
+        old_val = old_status.value if hasattr(old_status, 'value') else str(old_status)
+        new_val = task.status.value if hasattr(task.status, 'value') else str(task.status)
+
+        if task.status == TaskStatus.COMPLETED:
+            log_activity(
+                db=db,
+                actor_id=current_user.id,
+                action_type="TASK_COMPLETED",
+                entity_type="TASK",
+                entity_id=task.id,
+                team_id=team_id,
+                project_id=project_id,
+                task_id=task.id,
+                description=f"{current_user.full_name} completed \"{task.title}\"."
+            )
+        else:
+            log_activity(
+                db=db,
+                actor_id=current_user.id,
+                action_type="TASK_STATUS_CHANGED",
+                entity_type="TASK",
+                entity_id=task.id,
+                team_id=team_id,
+                project_id=project_id,
+                task_id=task.id,
+                description=f"{current_user.full_name} moved \"{task.title}\" from {old_val} to {new_val}.",
+                metadata={"field": "status", "old_value": old_val, "new_value": new_val}
+            )
+
+    # Check priority change
+    if task_in.priority is not None and task_in.priority != old_priority:
+        old_p = old_priority.value if hasattr(old_priority, 'value') else str(old_priority)
+        new_p = task.priority.value if hasattr(task.priority, 'value') else str(task.priority)
+        log_activity(
+            db=db,
+            actor_id=current_user.id,
+            action_type="TASK_PRIORITY_CHANGED",
+            entity_type="TASK",
+            entity_id=task.id,
+            team_id=team_id,
+            project_id=project_id,
+            task_id=task.id,
+            description=f"{current_user.full_name} changed priority of \"{task.title}\" from {old_p} to {new_p}.",
+            metadata={"field": "priority", "old_value": old_p, "new_value": new_p}
+        )
+
+    # Check due date change
+    if task_in.due_date is not None and task_in.due_date != old_due_date:
+        log_activity(
+            db=db,
+            actor_id=current_user.id,
+            action_type="TASK_DUE_DATE_CHANGED",
+            entity_type="TASK",
+            entity_id=task.id,
+            team_id=team_id,
+            project_id=project_id,
+            task_id=task.id,
+            description=f"{current_user.full_name} changed due date of \"{task.title}\"."
+        )
+
     # Send Notification if newly assigned
     if task.assigned_to_id and task.assigned_to_id != old_assigned_id and task.assigned_to_id != current_user.id:
-        notif = Notification(
+        create_notification(
+            db=db,
             user_id=task.assigned_to_id,
+            type="TASK_ASSIGNED",
             title="Task Reassigned",
             message=f"Task '{task.title}' was assigned to you by {current_user.full_name}.",
-            link=f"/tasks?id={task.id}"
+            related_entity_type="TASK",
+            related_entity_id=task.id,
+            action_url=f"/tasks?id={task.id}"
         )
-        db.add(notif)
-        db.commit()
 
     return format_task_response(task)
 
@@ -236,6 +374,7 @@ def update_task_status(
     if not is_lead and not is_assigned:
         raise HTTPException(status_code=403, detail="Only assigned member, Team Lead, or Admin can update task status")
 
+    old_status = task.status
     task.status = status_in.status
     if status_in.status == TaskStatus.COMPLETED:
         task.completed_date = datetime.utcnow()
@@ -245,18 +384,51 @@ def update_task_status(
     db.commit()
     db.refresh(task)
 
-    # Notify team lead or creator if member updated status
-    if is_assigned and not is_lead:
-        notify_user_id = task.project.team.lead_id or task.created_by_id
-        if notify_user_id and notify_user_id != current_user.id:
-            notif = Notification(
-                user_id=notify_user_id,
-                title="Task Status Updated",
-                message=f"{current_user.full_name} updated status of '{task.title}' to '{task.status.value}'.",
-                link=f"/tasks?id={task.id}"
-            )
-            db.add(notif)
-            db.commit()
+    team_id = task.project.team_id
+    project_id = task.project_id
+
+    old_val = old_status.value if hasattr(old_status, 'value') else str(old_status)
+    new_val = task.status.value if hasattr(task.status, 'value') else str(task.status)
+
+    if task.status == TaskStatus.COMPLETED:
+        log_activity(
+            db=db,
+            actor_id=current_user.id,
+            action_type="TASK_COMPLETED",
+            entity_type="TASK",
+            entity_id=task.id,
+            team_id=team_id,
+            project_id=project_id,
+            task_id=task.id,
+            description=f"{current_user.full_name} completed \"{task.title}\"."
+        )
+    else:
+        log_activity(
+            db=db,
+            actor_id=current_user.id,
+            action_type="TASK_STATUS_CHANGED",
+            entity_type="TASK",
+            entity_id=task.id,
+            team_id=team_id,
+            project_id=project_id,
+            task_id=task.id,
+            description=f"{current_user.full_name} moved \"{task.title}\" from {old_val} to {new_val}.",
+            metadata={"field": "status", "old_value": old_val, "new_value": new_val}
+        )
+
+    # Notify team lead or creator or assigned user
+    notify_user_id = task.assigned_to_id if is_lead else (task.project.team.lead_id or task.created_by_id)
+    if notify_user_id and notify_user_id != current_user.id:
+        create_notification(
+            db=db,
+            user_id=notify_user_id,
+            type="TASK_STATUS_CHANGED",
+            title="Task Status Updated",
+            message=f"{current_user.full_name} updated status of '{task.title}' to '{task.status.value}'.",
+            related_entity_type="TASK",
+            related_entity_id=task.id,
+            action_url=f"/tasks?id={task.id}"
+        )
 
     return format_task_response(task)
 
@@ -273,6 +445,23 @@ def delete_task(
     if not is_user_team_lead(current_user, task.project.team_id, db):
         raise HTTPException(status_code=403, detail="Only Admin or Team Lead can delete tasks")
 
+    task_title = task.title
+    project_id = task.project_id
+    team_id = task.project.team_id
+
     db.delete(task)
     db.commit()
+
+    log_activity(
+        db=db,
+        actor_id=current_user.id,
+        action_type="TASK_DELETED",
+        entity_type="TASK",
+        entity_id=task_id,
+        team_id=team_id,
+        project_id=project_id,
+        task_id=task_id,
+        description=f"{current_user.full_name} deleted task \"{task_title}\"."
+    )
+
     return None

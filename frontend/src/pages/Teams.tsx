@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { teamService } from '../services/teamService';
@@ -10,6 +10,7 @@ import { Users, Plus, Edit2, Trash2, Crown, X, ShieldAlert, Search, RefreshCw } 
 export const Teams: React.FC = () => {
   const { user, isAdmin } = useAuth();
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const [teams, setTeams] = useState<Team[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +49,7 @@ export const Teams: React.FC = () => {
       const users = await userService.getUsers();
       setAllUsers(Array.isArray(users) ? users : []);
     } catch (e) {
-      console.error("Failed to load users for teams dropdown:", e);
+      console.error("Failed to load users:", e);
     }
   };
 
@@ -72,7 +73,7 @@ export const Teams: React.FC = () => {
     if (tabFilter === 'my') {
       const membersList = t.members ?? [];
       const isMember = membersList.some((m) => m?.user_id === user?.id);
-      const isLead = t.lead_id === user?.id;
+      const isLead = t.lead_id === user?.id || t.owner_id === user?.id;
       return isMember || isLead;
     }
     return true;
@@ -80,7 +81,7 @@ export const Teams: React.FC = () => {
 
   const handleOpenCreateModal = () => {
     setEditingTeam(null);
-    setFormData({ name: '', description: '', lead_id: '', member_ids: [] });
+    setFormData({ name: '', description: '', lead_id: user?.id || '', member_ids: [] });
     setShowModal(true);
   };
 
@@ -111,17 +112,19 @@ export const Teams: React.FC = () => {
           lead_id: formData.lead_id !== '' ? Number(formData.lead_id) : undefined,
         });
         showToast('Team updated successfully', 'success');
+        setShowModal(false);
+        fetchTeams();
       } else {
-        await teamService.createTeam({
+        const newTeam = await teamService.createTeam({
           name: formData.name.trim(),
           description: formData.description.trim(),
           lead_id: formData.lead_id !== '' ? Number(formData.lead_id) : undefined,
           member_ids: formData.member_ids,
         });
-        showToast('Team created successfully', 'success');
+        showToast('Team created successfully!', 'success');
+        setShowModal(false);
+        navigate(`/teams/${newTeam.id}`);
       }
-      setShowModal(false);
-      fetchTeams();
     } catch (err: any) {
       showToast(err.message || 'Failed to save team', 'error');
     } finally {
@@ -142,16 +145,6 @@ export const Teams: React.FC = () => {
     } catch (err: any) {
       showToast(err.message || 'Failed to delete team', 'error');
     }
-  };
-
-  const toggleMemberSelection = (userId: number) => {
-    setFormData((prev) => {
-      const exists = prev.member_ids.includes(userId);
-      return {
-        ...prev,
-        member_ids: exists ? prev.member_ids.filter((id) => id !== userId) : [...prev.member_ids, userId],
-      };
-    });
   };
 
   if (loading) {
@@ -184,7 +177,7 @@ export const Teams: React.FC = () => {
   }
 
   const myTeamsCount = safeTeams.filter(
-    (t) => t.lead_id === user?.id || (t.members ?? []).some((m) => m?.user_id === user?.id)
+    (t) => t.lead_id === user?.id || t.owner_id === user?.id || (t.members ?? []).some((m) => m?.user_id === user?.id)
   ).length;
 
   return (
@@ -195,17 +188,16 @@ export const Teams: React.FC = () => {
           <h1 className="text-xl font-bold text-theme-main flex items-center gap-2 tracking-tight">
             <Users className="w-5 h-5 text-theme-primary" /> Teams
           </h1>
-          <p className="text-xs text-theme-muted mt-0.5">Manage your teams and members</p>
+          <p className="text-xs text-theme-muted mt-0.5">Manage your teams and collaboration</p>
         </div>
 
-        {isAdmin && (
-          <button
-            onClick={handleOpenCreateModal}
-            className="px-3.5 py-2 rounded-lg bg-theme-primary hover:bg-theme-secondary text-white font-medium text-xs shadow-sm flex items-center gap-1.5 transition"
-          >
-            <Plus className="w-4 h-4" /> Create Team
-          </button>
-        )}
+        {/* ANY authenticated user can create a team! */}
+        <button
+          onClick={handleOpenCreateModal}
+          className="px-3.5 py-2 rounded-lg bg-theme-primary hover:bg-theme-primary-hover text-white font-medium text-xs shadow-sm flex items-center gap-1.5 transition cursor-pointer"
+        >
+          <Plus className="w-4 h-4" /> Create Team
+        </button>
       </div>
 
       {/* Tabs and Search Toolbar */}
@@ -261,7 +253,8 @@ export const Teams: React.FC = () => {
           </div>
         ) : (
           filteredTeams.map((team) => {
-            const isLead = team.lead_id === user?.id || isAdmin;
+            const isOwnerOrLead = team.owner_id === user?.id || team.lead_id === user?.id || isAdmin;
+            const isOwner = team.owner_id === user?.id || isAdmin;
             const memberCount = team.member_count ?? (team.members ?? []).length;
             const projectCount = team.project_count ?? 0;
 
@@ -270,16 +263,16 @@ export const Teams: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex items-start justify-between">
                     <h2 className="text-sm font-bold text-theme-main leading-tight">{team.name}</h2>
-                    {isLead && (
+                    {isOwnerOrLead && (
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleOpenEditModal(team)}
-                          className="p-1 rounded text-theme-muted hover:text-theme-main hover:bg-theme-accent/30 transition"
+                          className="p-1 rounded text-theme-muted hover:text-theme-main hover:bg-theme-surface-active transition"
                           title="Edit Team"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
-                        {isAdmin && (
+                        {isOwner && (
                           <button
                             onClick={() => setDeletingTeamId(team.id)}
                             className="p-1 rounded text-rose-500 hover:bg-rose-500/10 transition"
@@ -296,13 +289,13 @@ export const Teams: React.FC = () => {
                     {team.description || 'No description provided.'}
                   </p>
 
-                  {/* Team Lead Badge */}
+                  {/* Owner & Lead Badge */}
                   <div className="flex items-center gap-2 p-2 rounded-lg bg-theme-bg border border-theme-border">
                     <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                     <div className="overflow-hidden">
-                      <span className="text-[9px] text-theme-muted block font-medium uppercase">Team Lead</span>
+                      <span className="text-[9px] text-theme-muted block font-medium uppercase">Team Owner / Lead</span>
                       <span className="text-xs font-semibold text-theme-main truncate block">
-                        {team.lead?.full_name ?? 'No Lead Assigned'}
+                        {team.owner?.full_name || team.lead?.full_name || 'No Owner Assigned'}
                       </span>
                     </div>
                   </div>
@@ -345,7 +338,7 @@ export const Teams: React.FC = () => {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Frontend Core Team"
+                  placeholder="e.g. Core Product Team"
                   className="w-full bg-theme-bg border border-theme-border rounded-lg px-3 py-1.5 text-xs text-theme-main focus:outline-none focus:border-theme-primary"
                   required
                 />
@@ -356,49 +349,10 @@ export const Teams: React.FC = () => {
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Brief summary of team responsibilities"
+                  placeholder="Brief summary of team goals and responsibilities"
                   className="w-full bg-theme-bg border border-theme-border rounded-lg px-3 py-1.5 text-xs text-theme-main focus:outline-none focus:border-theme-primary h-20"
                 />
               </div>
-
-              <div>
-                <label className="block text-xs font-medium text-theme-main mb-1">Assign Team Lead</label>
-                <select
-                  value={formData.lead_id}
-                  onChange={(e) => setFormData({ ...formData, lead_id: e.target.value ? Number(e.target.value) : '' })}
-                  className="w-full bg-theme-bg border border-theme-border rounded-lg px-3 py-1.5 text-xs text-theme-main focus:outline-none focus:border-theme-primary"
-                >
-                  <option value="">-- Select Team Lead --</option>
-                  {allUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.full_name} ({u.email})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {!editingTeam && (
-                <div>
-                  <label className="block text-xs font-medium text-theme-main mb-1.5">Initial Team Members</label>
-                  <div className="max-h-36 overflow-y-auto space-y-1 p-2 border border-theme-border rounded-lg bg-theme-bg">
-                    {allUsers.map((u) => {
-                      const isSelected = formData.member_ids.includes(u.id);
-                      return (
-                        <div
-                          key={u.id}
-                          onClick={() => toggleMemberSelection(u.id)}
-                          className={`p-1.5 rounded text-xs cursor-pointer flex items-center justify-between border transition ${
-                            isSelected ? 'bg-theme-accent/50 border-theme-primary text-theme-main font-medium' : 'border-transparent text-theme-muted hover:bg-theme-accent/20'
-                          }`}
-                        >
-                          <span>{u.full_name}</span>
-                          <span className="text-[10px] text-theme-muted">{u.email}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
               <div className="flex justify-end gap-2 pt-3 border-t border-theme-border">
                 <button
@@ -411,7 +365,7 @@ export const Teams: React.FC = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-theme-primary hover:bg-theme-secondary text-white transition disabled:opacity-50"
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-theme-primary hover:bg-theme-primary-hover text-white transition disabled:opacity-50"
                 >
                   {submitting ? 'Saving...' : editingTeam ? 'Update Team' : 'Create Team'}
                 </button>

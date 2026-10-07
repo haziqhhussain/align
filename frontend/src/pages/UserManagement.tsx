@@ -232,9 +232,10 @@ export const UserManagement: React.FC = () => {
             <thead className="bg-theme-accent/30 border-b border-theme-border uppercase text-[10px] font-bold text-theme-muted tracking-wider">
               <tr>
                 <th className="py-3 px-4">User</th>
-                <th className="py-3 px-4">Global Role</th>
+                <th className="py-3 px-4">Email</th>
+                <th className="py-3 px-4">Role</th>
                 <th className="py-3 px-4">Teams</th>
-                <th className="py-3 px-4">Created</th>
+                <th className="py-3 px-4">Joined</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -253,20 +254,20 @@ export const UserManagement: React.FC = () => {
                             {u.full_name.charAt(0)}
                           </div>
                         )}
-                        <div>
-                          <div className="font-bold text-theme-main flex items-center gap-1.5">
-                            {u.full_name}
-                            {isSelf && (
-                              <span className="text-[9px] bg-theme-primary/10 text-theme-primary px-1.5 py-0.2 rounded border border-theme-primary/20 font-medium">
-                                You
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[11px] text-theme-muted flex items-center gap-1">
-                            <Mail className="w-3 h-3 text-theme-muted shrink-0" /> {u.email}
-                          </div>
+                        <div className="font-bold text-theme-main flex items-center gap-1.5">
+                          {u.full_name}
+                          {isSelf && (
+                            <span className="text-[9px] bg-theme-primary/10 text-theme-primary px-1.5 py-0.2 rounded border border-theme-primary/20 font-medium">
+                              You
+                            </span>
+                          )}
                         </div>
                       </div>
+                    </td>
+
+                    {/* Email */}
+                    <td className="py-3 px-4 text-theme-muted text-[11px]">
+                      {u.email}
                     </td>
 
                     {/* Global Role */}
@@ -300,7 +301,7 @@ export const UserManagement: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* Created Date */}
+                    {/* Joined Date */}
                     <td className="py-3 px-4 text-theme-muted text-[11px]">
                       {formatDate(u.created_at)}
                     </td>
@@ -308,6 +309,13 @@ export const UserManagement: React.FC = () => {
                     {/* Actions */}
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Link
+                          to={`/users/${u.id}`}
+                          className="px-2 py-1 rounded bg-theme-bg border border-theme-border hover:bg-theme-accent/30 text-theme-main text-[11px] font-medium transition"
+                        >
+                          Profile
+                        </Link>
+
                         <button
                           onClick={() => {
                             setAddToTeamTarget(u);

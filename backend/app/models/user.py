@@ -28,3 +28,4 @@ class User(Base):
     created_tasks = relationship("Task", back_populates="created_by", foreign_keys="Task.created_by_id")
     comments = relationship("TaskComment", back_populates="user", cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    uploaded_attachments = relationship("Attachment", back_populates="uploaded_by", cascade="all, delete-orphan")

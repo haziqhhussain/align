@@ -38,3 +38,14 @@ class UserResponse(UserBase):
 
 class UserDetailResponse(UserResponse):
     teams_info: List[TeamRoleInfo] = []
+
+class SharedTeamInfo(BaseModel):
+    team_id: int
+    team_name: str
+
+class UserPublicProfileResponse(UserResponse):
+    friendship_status: str = "NONE"
+    friend_request_id: Optional[int] = None
+    teams_info: List[dict] = []
+    shared_teams: List[SharedTeamInfo] = []
+

@@ -18,11 +18,13 @@ class TeamUpdate(BaseModel):
 
 class TeamMemberAdd(BaseModel):
     user_id: int
+    role: Optional[str] = "MEMBER"
 
 class TeamMemberResponse(BaseModel):
     id: int
     user_id: int
     team_id: int
+    role: str = "MEMBER"
     joined_at: datetime
     user: UserResponse
 
@@ -30,9 +32,11 @@ class TeamMemberResponse(BaseModel):
 
 class TeamResponse(TeamBase):
     id: int
+    owner_id: Optional[int] = None
     lead_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
+    owner: Optional[UserResponse] = None
     lead: Optional[UserResponse] = None
     members: List[TeamMemberResponse] = []
     member_count: Optional[int] = 0

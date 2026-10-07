@@ -26,3 +26,4 @@ class Project(Base):
     # Relationships
     team = relationship("Team", back_populates="projects")
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
+    attachments = relationship("Attachment", back_populates="project", cascade="all, delete-orphan")

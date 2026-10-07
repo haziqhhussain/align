@@ -9,16 +9,21 @@ export default {
     extend: {
       colors: {
         theme: {
-          bg: 'var(--background)',
-          surface: 'var(--surface)',
-          'surface-elevated': 'var(--surface-elevated)',
-          'surface-active': 'var(--surface-active)',
-          border: 'var(--border)',
+          bg: 'var(--bg-canvas)',
+          surface: 'var(--bg-surface)',
+          'surface-soft': 'var(--bg-surface-soft)',
+          'surface-elevated': 'var(--bg-surface)',
+          'surface-active': 'var(--bg-selected)',
+          'surface-secondary': 'var(--bg-surface-soft)',
+          border: 'var(--border-default)',
+          'border-soft': 'var(--border-soft)',
+          'border-input': 'var(--border-input)',
           main: 'var(--text-primary)',
           secondary: 'var(--text-secondary)',
           muted: 'var(--text-muted)',
-          primary: 'var(--primary)',
-          'primary-hover': 'var(--primary-hover)',
+          primary: 'var(--accent-primary)',
+          'primary-hover': 'var(--accent-hover)',
+          'accent-soft': 'var(--accent-soft)',
         }
       },
       fontFamily: {
@@ -28,5 +33,3 @@ export default {
   },
   plugins: [],
 }
-
-

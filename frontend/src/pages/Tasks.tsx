@@ -5,7 +5,12 @@ import { useToast } from '../context/ToastContext';
 import { taskService } from '../services/taskService';
 import { projectService } from '../services/projectService';
 import { userService } from '../services/userService';
-import type { Task, Project, User, TaskPriority, TaskStatus, TaskComment } from '../types';
+import { activityService } from '../services/activityService';
+import type { Task, Project, User, TaskPriority, TaskStatus, TaskComment, ActivityLog } from '../types';
+import { ActivityTimeline } from '../components/common/ActivityTimeline';
+import { SubtaskList } from '../components/subtasks/SubtaskList';
+import { SubtaskProgress } from '../components/subtasks/SubtaskProgress';
+import { AttachmentList } from '../components/attachments/AttachmentList';
 import {
   CheckSquare,
   Plus,
@@ -15,7 +20,10 @@ import {
   Edit2,
   Trash2,
   X,
-  Send
+  Send,
+  History,
+  Activity as ActivityIcon,
+  ListChecks
 } from 'lucide-react';
 import { formatDate, formatDateTime, getStatusBadgeColor, getPriorityBadgeColor } from '../utils/format';
 
@@ -70,6 +78,7 @@ export const Tasks: React.FC = () => {
   // Task Details & Comment Drawer/Modal
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [comments, setComments] = useState<TaskComment[]>([]);
+  const [taskActivities, setTaskActivities] = useState<ActivityLog[]>([]);
   const [newComment, setNewComment] = useState('');
   const [commenting, setCommenting] = useState(false);
 
@@ -217,8 +226,12 @@ export const Tasks: React.FC = () => {
   const handleOpenTaskDetails = async (t: Task) => {
     setSelectedTask(t);
     try {
-      const cList = await taskService.getComments(t.id);
+      const [cList, actList] = await Promise.all([
+        taskService.getComments(t.id),
+        activityService.getTaskActivity(t.id)
+      ]);
       setComments(cList);
+      setTaskActivities(Array.isArray(actList) ? actList : []);
     } catch (e) {
       console.error(e);
     }
@@ -380,6 +393,14 @@ export const Tasks: React.FC = () => {
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5" /> Due {formatDate(task.due_date)}
                     </span>
+                    {task.subtask_count && task.subtask_count > 0 ? (
+                      <SubtaskProgress
+                        completedCount={task.completed_subtask_count || 0}
+                        totalCount={task.subtask_count}
+                        progressPercentage={task.subtask_progress || 0}
+                        compact
+                      />
+                    ) : null}
                   </div>
                 </div>
 
@@ -630,6 +651,35 @@ export const Tasks: React.FC = () => {
                 <div>Due Date: <strong className="text-theme-main">{formatDate(selectedTask.due_date)}</strong></div>
               </div>
 
+              {/* Subtasks / Checklist Section */}
+              <SubtaskList
+                taskId={selectedTask.id}
+                teamUsers={users}
+                parentTaskStatus={selectedTask.status}
+                onSubtaskChange={() => {
+                  fetchTasks();
+                  fetchTaskActivities(selectedTask.id);
+                }}
+                onCompleteParentTask={async () => {
+                  try {
+                    await taskService.updateTaskStatus(selectedTask.id, 'Completed');
+                    setSelectedTask({ ...selectedTask, status: 'Completed' });
+                    fetchTasks();
+                    showToast('Parent task marked as Completed', 'success');
+                  } catch (err: any) {
+                    showToast(err.message || 'Failed to update task status', 'error');
+                  }
+                }}
+              />
+
+              {/* Attachments Section */}
+              <div className="border-t border-theme-border pt-3">
+                <AttachmentList
+                  taskId={selectedTask.id}
+                  onAttachmentChange={() => fetchTaskActivities(selectedTask.id)}
+                />
+              </div>
+
               <div className="border-t border-theme-border pt-3 space-y-3">
                 <h3 className="text-xs font-bold text-theme-main flex items-center gap-1.5">
                   <MessageSquare className="w-3.5 h-3.5 text-theme-primary" /> Discussion Thread ({comments.length})
@@ -667,6 +717,16 @@ export const Tasks: React.FC = () => {
                     <Send className="w-3.5 h-3.5" /> Post
                   </button>
                 </form>
+              </div>
+
+              {/* Task History Section */}
+              <div className="border-t border-theme-border pt-3 space-y-3">
+                <h3 className="text-xs font-bold text-theme-main flex items-center gap-1.5">
+                  <History className="w-3.5 h-3.5 text-emerald-500" /> Task History & Activity
+                </h3>
+                <div className="max-h-56 overflow-y-auto pr-1">
+                  <ActivityTimeline activities={taskActivities} emptyMessage="No history logged for this task yet." compact />
+                </div>
               </div>
             </div>
           </div>

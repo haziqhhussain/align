@@ -91,7 +91,14 @@ def test_user_management():
     print(f"Successfully demoted user ID {new_user_id} back to {demoted['role']}")
 
     print("\n--- 8. Test Protection Against Removing Final Admin ---")
-    # Attempt to demote the primary Admin when they are the only Admin
+    # Fetch all admins and demote others to test single last admin protection
+    status, all_users = make_request(f"{BASE_URL}/users", headers=admin_headers)
+    other_admins = [u for u in all_users if u["role"] == "ADMIN" and u["id"] != admin_login["user"]["id"]]
+    
+    for oa in other_admins:
+        make_request(f"{BASE_URL}/users/{oa['id']}/role", method="PATCH", data={"role": "MEMBER"}, headers=admin_headers)
+
+    # Attempt to demote the primary Admin when they are the only remaining Admin
     admin_user_id = admin_login["user"]["id"]
     status, last_admin_res = make_request(f"{BASE_URL}/users/{admin_user_id}/role", method="PATCH", data={
         "role": "MEMBER"
@@ -99,7 +106,12 @@ def test_user_management():
     assert status == 400, f"Expected 400 for last admin demotion, got {status}: {last_admin_res}"
     print(f"Confirmed last Admin protection: '{last_admin_res.get('detail')}'")
 
+    # Restore other admins
+    for oa in other_admins:
+        make_request(f"{BASE_URL}/users/{oa['id']}/role", method="PATCH", data={"role": "ADMIN"}, headers=admin_headers)
+
     print("\n--- 9. Cleanup Test User ---")
+
     status, del_res = make_request(f"{BASE_URL}/users/{new_user_id}", method="DELETE", headers=admin_headers)
     assert status == 204
     print(f"Successfully deleted test user ID {new_user_id}.")

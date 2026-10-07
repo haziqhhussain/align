@@ -5,9 +5,10 @@ from app.database.session import get_db
 from app.models.user import User, UserRole
 from app.models.task import Task
 from app.models.comment import TaskComment
-from app.models.notification import Notification
 from app.schemas.comment import CommentCreate, CommentUpdate, CommentResponse
 from app.dependencies.auth import get_current_user, is_user_team_lead, is_user_team_member
+from app.services.notification_service import create_notification
+from app.services.activity_service import log_activity
 
 router = APIRouter(tags=["Comments"])
 
@@ -50,17 +51,31 @@ def create_comment(
     db.commit()
     db.refresh(comment)
 
+    log_activity(
+        db=db,
+        actor_id=current_user.id,
+        action_type="COMMENT_ADDED",
+        entity_type="COMMENT",
+        entity_id=comment.id,
+        team_id=task.project.team_id,
+        project_id=task.project_id,
+        task_id=task.id,
+        description=f"{current_user.full_name} commented on \"{task.title}\"."
+    )
+
     # Send Notification to assigned user or lead if someone else comments
     recipient_id = task.assigned_to_id if task.assigned_to_id != current_user.id else task.project.team.lead_id
     if recipient_id and recipient_id != current_user.id:
-        notif = Notification(
+        create_notification(
+            db=db,
             user_id=recipient_id,
-            title="New Task Comment",
+            type="TASK_COMMENT_ADDED",
+            title="New Comment on Task",
             message=f"{current_user.full_name} commented on task '{task.title}'.",
-            link=f"/tasks?id={task.id}"
+            related_entity_type="TASK",
+            related_entity_id=task.id,
+            action_url=f"/tasks?id={task.id}"
         )
-        db.add(notif)
-        db.commit()
 
     return comment
 
@@ -83,6 +98,19 @@ def update_comment(
     comment.content = comment_in.content
     db.commit()
     db.refresh(comment)
+
+    log_activity(
+        db=db,
+        actor_id=current_user.id,
+        action_type="COMMENT_UPDATED",
+        entity_type="COMMENT",
+        entity_id=comment.id,
+        team_id=comment.task.project.team_id,
+        project_id=comment.task.project_id,
+        task_id=comment.task_id,
+        description=f"{current_user.full_name} edited a comment on \"{comment.task.title}\"."
+    )
+
     return comment
 
 @router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -99,6 +127,24 @@ def delete_comment(
     if comment.user_id != current_user.id and not is_lead:
         raise HTTPException(status_code=403, detail="Only comment author, Team Lead, or Admin can delete comment")
 
+    task_title = comment.task.title
+    team_id = comment.task.project.team_id
+    project_id = comment.task.project_id
+    task_id = comment.task_id
+
     db.delete(comment)
     db.commit()
+
+    log_activity(
+        db=db,
+        actor_id=current_user.id,
+        action_type="COMMENT_DELETED",
+        entity_type="COMMENT",
+        entity_id=comment_id,
+        team_id=team_id,
+        project_id=project_id,
+        task_id=task_id,
+        description=f"{current_user.full_name} deleted a comment from \"{task_title}\"."
+    )
+
     return None

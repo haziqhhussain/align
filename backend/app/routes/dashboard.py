@@ -8,6 +8,7 @@ from app.models.user import User, UserRole
 from app.models.team import Team, TeamMember
 from app.models.project import Project, ProjectStatus
 from app.models.task import Task, TaskStatus, TaskPriority
+from app.models.social import FriendRequest, FriendRequestStatus, TeamInvitation, TeamInvitationStatus
 from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
@@ -22,14 +23,26 @@ def get_dashboard_stats(
     # Determine user role status
     is_admin = (current_user.role == UserRole.ADMIN)
 
-    # Check teams managed as lead
-    managed_teams = db.query(Team).filter(Team.lead_id == current_user.id).all()
+    # Check teams managed as lead or owner
+    managed_teams = db.query(Team).filter(
+        (Team.owner_id == current_user.id) | (Team.lead_id == current_user.id)
+    ).all()
     managed_team_ids = [t.id for t in managed_teams]
-    is_team_lead = len(managed_team_ids) > 0 or is_admin
 
     # Member team memberships
     member_team_entries = db.query(TeamMember.team_id).filter(TeamMember.user_id == current_user.id).all()
     user_team_ids = list(set([t[0] for t in member_team_entries] + managed_team_ids))
+
+    # Social counts
+    pending_friend_requests = db.query(FriendRequest).filter(
+        FriendRequest.receiver_id == current_user.id,
+        FriendRequest.status == FriendRequestStatus.PENDING
+    ).count()
+
+    pending_team_invitations = db.query(TeamInvitation).filter(
+        TeamInvitation.receiver_id == current_user.id,
+        TeamInvitation.status == TeamInvitationStatus.PENDING
+    ).count()
 
     # --- ADMIN STATS ---
     if is_admin:
@@ -71,7 +84,7 @@ def get_dashboard_stats(
             team_progress.append({
                 "id": t.id,
                 "name": t.name,
-                "lead_name": t.lead.full_name if t.lead else "No Lead",
+                "lead_name": t.owner.full_name if t.owner else (t.lead.full_name if t.lead else "No Owner"),
                 "member_count": m_count,
                 "project_count": len(t.projects),
                 "task_count": t_total,
@@ -88,13 +101,15 @@ def get_dashboard_stats(
                 "total_tasks": total_tasks,
                 "completed_tasks": completed_tasks,
                 "pending_tasks": pending_tasks,
-                "overdue_tasks": overdue_tasks
+                "overdue_tasks": overdue_tasks,
+                "pending_friend_requests": pending_friend_requests,
+                "pending_team_invitations": pending_team_invitations
             },
             "recent_projects": recent_projects,
             "team_progress": team_progress
         }
 
-    # --- TEAM LEAD STATS (for leads of 1+ teams) ---
+    # --- TEAM LEAD / OWNER STATS (for leads/owners of 1+ teams) ---
     if len(managed_team_ids) > 0:
         managed_projects = db.query(Project).filter(Project.team_id.in_(managed_team_ids)).all()
         managed_project_ids = [p.id for p in managed_projects]
@@ -148,7 +163,9 @@ def get_dashboard_stats(
                 "total_tasks": total_tasks,
                 "completed_tasks": completed_tasks,
                 "pending_tasks": pending_tasks,
-                "overdue_tasks": overdue_tasks
+                "overdue_tasks": overdue_tasks,
+                "pending_friend_requests": pending_friend_requests,
+                "pending_team_invitations": pending_team_invitations
             },
             "member_progress": member_progress,
             "recent_activity": recent_activity
@@ -203,7 +220,9 @@ def get_dashboard_stats(
             "in_progress_tasks": in_progress_count,
             "review_tasks": review_count,
             "completed_tasks": completed_count,
-            "overdue_tasks": overdue_count
+            "overdue_tasks": overdue_count,
+            "pending_friend_requests": pending_friend_requests,
+            "pending_team_invitations": pending_team_invitations
         },
         "my_projects": my_projects,
         "upcoming_deadlines": upcoming_deadlines

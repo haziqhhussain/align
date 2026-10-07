@@ -5,6 +5,7 @@ from app.models.task import TaskPriority, TaskStatus
 from app.schemas.user import UserResponse
 from app.schemas.project import ProjectResponse
 from app.schemas.comment import CommentResponse
+from app.schemas.subtask import SubtaskResponse
 
 class TaskBase(BaseModel):
     title: str
@@ -40,9 +41,14 @@ class TaskResponse(TaskBase):
     updated_at: datetime
     is_overdue: Optional[bool] = False
     
+    subtask_count: Optional[int] = 0
+    completed_subtask_count: Optional[int] = 0
+    subtask_progress: Optional[int] = 0
+
     project: Optional[ProjectResponse] = None
     assigned_to: Optional[UserResponse] = None
     created_by: Optional[UserResponse] = None
     comments: List[CommentResponse] = []
+    subtasks: List[SubtaskResponse] = []
 
     model_config = ConfigDict(from_attributes=True)

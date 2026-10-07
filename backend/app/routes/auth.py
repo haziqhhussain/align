@@ -7,6 +7,7 @@ from app.schemas.user import UserCreate, UserResponse
 from app.auth.password import get_password_hash, verify_password
 from app.auth.jwt import create_access_token
 from app.dependencies.auth import get_current_user
+from app.services.activity_service import log_activity
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -29,6 +30,16 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    log_activity(
+        db=db,
+        actor_id=user.id,
+        action_type="USER_REGISTERED",
+        entity_type="USER",
+        entity_id=user.id,
+        description=f"{user.full_name} registered an account."
+    )
+
     return user
 
 @router.post("/login", response_model=TokenResponse)

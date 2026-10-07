@@ -63,3 +63,12 @@ export function getPriorityBadgeColor(priority: string): string {
       return 'bg-slate-100 dark:bg-[#242424] text-slate-600 dark:text-[#D1D5DB] border-slate-200 dark:border-[#343434]';
   }
 }
+
+export function formatFileSize(bytes: number): string {
+  if (!bytes || bytes <= 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const num = (bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 1);
+  return `${num} ${sizes[i]}`;
+}

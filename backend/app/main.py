@@ -8,11 +8,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database.session import Base, engine
+from app.database.migrate import run_migrations
 from app.database.seed import seed_db
 from app.routes import api_router
 
-# Create database tables
+# Create database tables & run schema migrations for existing DBs
 Base.metadata.create_all(bind=engine)
+try:
+    run_migrations()
+except Exception as e:
+    print(f"Migration info: {e}")
 
 # Seed database with initial Admin, Teams, Projects & Tasks
 try:

@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { userService } from '../services/userService';
-import { User as UserIcon, Save, Shield, Bell, Key, Sparkles } from 'lucide-react';
+import { User as UserIcon, Save, Shield, Bell, Key, Sun, Moon, Monitor } from 'lucide-react';
 
 export const Profile: React.FC = () => {
   const { user, refreshUser } = useAuth();
+  const { theme, setTheme } = useTheme();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'appearance' | 'notifications'>('profile');
   const [fullName, setFullName] = useState(user?.full_name || '');
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || '');
   const [saving, setSaving] = useState(false);
@@ -35,13 +37,13 @@ export const Profile: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold text-theme-main flex items-center gap-2 tracking-tight">
-          <UserIcon className="w-5 h-5 text-theme-primary" /> Profile & Settings
+          <UserIcon className="w-5 h-5 text-theme-primary" /> Profile & Account Settings
         </h1>
-        <p className="text-xs text-theme-muted mt-0.5">Manage your personal account details, global permissions, and preferences</p>
+        <p className="text-xs text-theme-muted mt-0.5">Manage your personal account details, global security, appearance theme, and notifications</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Left Section Navigation Tabs */}
+        {/* Left Navigation */}
         <div className="md:col-span-1 space-y-1">
           <div className="saas-panel p-2 space-y-1">
             <button
@@ -65,7 +67,19 @@ export const Profile: React.FC = () => {
               }`}
             >
               <Key className="w-4 h-4 shrink-0" />
-              <span>Security & Password</span>
+              <span>Security</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('appearance')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition ${
+                activeTab === 'appearance'
+                  ? 'bg-theme-surface-active text-theme-primary'
+                  : 'text-theme-muted hover:text-theme-main hover:bg-theme-bg'
+              }`}
+            >
+              <Sun className="w-4 h-4 shrink-0" />
+              <span>Appearance</span>
             </button>
 
             <button
@@ -82,11 +96,10 @@ export const Profile: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Details Panel */}
+        {/* Right Content */}
         <div className="md:col-span-3 space-y-6">
           {activeTab === 'profile' && (
             <div className="saas-card p-6 space-y-6">
-              {/* Profile Header Banner */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 border-b border-theme-border pb-6">
                 {user?.avatar_url ? (
                   <img src={user.avatar_url} alt={user.full_name} className="w-16 h-16 rounded-xl object-cover border border-theme-border" />
@@ -106,7 +119,6 @@ export const Profile: React.FC = () => {
                 </div>
               </div>
 
-              {/* Editable Profile Form */}
               <form onSubmit={handleSaveProfile} className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-theme-main mb-1">Full Name</label>
@@ -132,7 +144,7 @@ export const Profile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-theme-muted mb-1">Email Address (Managed by Organization)</label>
+                  <label className="block text-xs font-medium text-theme-muted mb-1">Email Address</label>
                   <input
                     type="email"
                     value={user?.email || ''}
@@ -160,13 +172,65 @@ export const Profile: React.FC = () => {
                 <Key className="w-4 h-4 text-theme-primary" /> Security & Password
               </h2>
               <p className="text-xs text-theme-muted">
-                Your password and authentication are managed securely with bcrypt hashing. Contact your organization administrator to update authentication credentials.
+                Your password and authentication are managed securely with bcrypt hashing.
               </p>
               <div className="p-4 rounded-lg bg-theme-bg border border-theme-border text-xs space-y-2">
                 <div className="flex items-center gap-2 text-theme-main font-semibold">
-                  <Shield className="w-4 h-4 text-emerald-500" /> Account Security Status: Verified
+                  <Shield className="w-4 h-4 text-emerald-500" /> Account Status: Active & Secured
                 </div>
-                <p className="text-theme-muted">Role: <strong className="text-theme-main">{user?.role}</strong> &bull; Authenticated via JWT Session Tokens.</p>
+                <p className="text-theme-muted">Role: <strong className="text-theme-main">{user?.role}</strong></p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'appearance' && (
+            <div className="saas-card p-6 space-y-4">
+              <h2 className="text-sm font-bold text-theme-main flex items-center gap-2">
+                <Sun className="w-4 h-4 text-theme-primary" /> Appearance & Theme Mode
+              </h2>
+              <p className="text-xs text-theme-muted">
+                Customize how Align looks on your device. Choose between light, dark, or system mode.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setTheme('light')}
+                  className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition ${
+                    theme === 'light'
+                      ? 'border-theme-primary bg-theme-surface-active text-theme-primary shadow-xs'
+                      : 'border-theme-border bg-theme-bg text-theme-muted hover:text-theme-main'
+                  }`}
+                >
+                  <Sun className="w-6 h-6" />
+                  <span className="text-xs font-bold">Light</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTheme('dark')}
+                  className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition ${
+                    theme === 'dark'
+                      ? 'border-theme-primary bg-theme-surface-active text-theme-primary shadow-xs'
+                      : 'border-theme-border bg-theme-bg text-theme-muted hover:text-theme-main'
+                  }`}
+                >
+                  <Moon className="w-6 h-6" />
+                  <span className="text-xs font-bold">Dark</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTheme('system')}
+                  className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition ${
+                    theme === 'system'
+                      ? 'border-theme-primary bg-theme-surface-active text-theme-primary shadow-xs'
+                      : 'border-theme-border bg-theme-bg text-theme-muted hover:text-theme-main'
+                  }`}
+                >
+                  <Monitor className="w-6 h-6" />
+                  <span className="text-xs font-bold">System</span>
+                </button>
               </div>
             </div>
           )}
@@ -202,3 +266,4 @@ export const Profile: React.FC = () => {
     </div>
   );
 };
+

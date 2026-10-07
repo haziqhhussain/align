@@ -27,6 +27,12 @@ class Settings(BaseSettings):
         "http://localhost:8000"
     ]
 
+    # File Uploads
+    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads"))
+    MAX_UPLOAD_SIZE: int = int(os.getenv("MAX_UPLOAD_SIZE", str(10 * 1024 * 1024))) # 10 MB
+    ALLOWED_EXTENSIONS: set = {"pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv", "png", "jpg", "jpeg", "webp", "zip"}
+    FORBIDDEN_EXTENSIONS: set = {"exe", "bat", "cmd", "ps1", "sh", "dll", "msi", "scr", "com", "vbs", "jar", "app"}
+
     class Config:
         case_sensitive = True
         env_file = ".env"

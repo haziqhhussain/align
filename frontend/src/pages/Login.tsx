@@ -30,7 +30,7 @@ export const Login: React.FC = () => {
     try {
       await login({ email, password });
       showToast('Welcome back to Align!', 'success');
-      navigate('/');
+      navigate('/dashboard');
     } catch (err: any) {
       showToast(err.message || 'Login failed', 'error');
     } finally {
@@ -45,7 +45,7 @@ export const Login: React.FC = () => {
     try {
       await login({ email: demoEmail, password: demoPass });
       showToast(`Logged in as demo user`, 'success');
-      navigate('/');
+      navigate('/dashboard');
     } catch (err: any) {
       showToast(err.message || 'Demo login failed', 'error');
     } finally {

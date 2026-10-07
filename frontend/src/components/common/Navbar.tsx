@@ -4,7 +4,26 @@ import { useAuth } from '../../context/AuthContext';
 import { notificationService } from '../../services/userService';
 import type { NotificationItem } from '../../types';
 import { ThemeToggle } from './ThemeToggle';
-import { Bell, LogOut, User as UserIcon, Menu, Layers, Check, ChevronRight, Search } from 'lucide-react';
+import {
+  Bell,
+  LogOut,
+  User as UserIcon,
+  Menu,
+  Layers,
+  Check,
+  ChevronRight,
+  Search,
+  UserPlus,
+  UserCheck,
+  Users,
+  ShieldCheck,
+  CheckSquare,
+  MessageSquare,
+  Folder,
+  AlertCircle,
+  Clock,
+  ArrowRight
+} from 'lucide-react';
 import { formatDateTime } from '../../utils/format';
 
 interface NavbarProps {
@@ -12,14 +31,47 @@ interface NavbarProps {
 }
 
 const pageTitles: Record<string, string> = {
-  '/': 'Dashboard',
+  '/dashboard': 'Dashboard',
+  '/': 'Landing Page',
   '/user-management': 'User Management',
+  '/connections': 'Connections',
+  '/invitations': 'Team Invitations',
   '/teams': 'Teams',
   '/projects': 'Projects',
   '/tasks': 'Tasks',
   '/my-tasks': 'My Assigned Tasks',
   '/members': 'Members Directory',
+  '/notifications': 'Notifications',
   '/profile': 'User Profile',
+};
+
+const getNotificationIcon = (type?: string) => {
+  switch (type) {
+    case 'FRIEND_REQUEST':
+      return <UserPlus className="w-3.5 h-3.5 text-blue-500" />;
+    case 'FRIEND_REQUEST_ACCEPTED':
+      return <UserCheck className="w-3.5 h-3.5 text-emerald-500" />;
+    case 'TEAM_INVITATION':
+      return <Users className="w-3.5 h-3.5 text-blue-500" />;
+    case 'TEAM_INVITATION_ACCEPTED':
+      return <UserCheck className="w-3.5 h-3.5 text-teal-500" />;
+    case 'TEAM_ROLE_CHANGED':
+      return <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />;
+    case 'TASK_ASSIGNED':
+      return <CheckSquare className="w-3.5 h-3.5 text-blue-500" />;
+    case 'TASK_STATUS_CHANGED':
+      return <CheckSquare className="w-3.5 h-3.5 text-blue-500" />;
+    case 'TASK_COMMENT_ADDED':
+      return <MessageSquare className="w-3.5 h-3.5 text-amber-500" />;
+    case 'PROJECT_UPDATED':
+      return <Folder className="w-3.5 h-3.5 text-blue-500" />;
+    case 'TASK_DUE_SOON':
+      return <Clock className="w-3.5 h-3.5 text-amber-500" />;
+    case 'TASK_OVERDUE':
+      return <AlertCircle className="w-3.5 h-3.5 text-rose-500" />;
+    default:
+      return <Bell className="w-3.5 h-3.5 text-theme-primary" />;
+  }
 };
 
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
@@ -34,7 +86,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
   // Compute breadcrumb title
   const currentPath = location.pathname;
-  const pageTitle = pageTitles[currentPath] || (currentPath.startsWith('/teams/') ? 'Team Details' : currentPath.startsWith('/projects/') ? 'Project Details' : 'Align');
+  const pageTitle = pageTitles[currentPath] || (currentPath.startsWith('/teams/') ? 'Team Details' : currentPath.startsWith('/users/') ? 'User Profile' : currentPath.startsWith('/projects/') ? 'Project Details' : 'Align');
 
   const fetchNotifications = async () => {
     if (!user) return;
@@ -89,20 +141,29 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
     }
   };
 
+  const [globalSearch, setGlobalSearch] = useState('');
+
+  const handleGlobalSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && globalSearch.trim()) {
+      navigate(`/connections?q=${encodeURIComponent(globalSearch.trim())}`);
+      setGlobalSearch('');
+    }
+  };
+
   return (
-    <header className="sticky top-0 z-40 w-full bg-theme-bg border-b border-theme-border px-4 lg:px-6 h-14 flex items-center justify-between transition-colors">
+    <header className="sticky top-0 z-40 w-full bg-theme-surface border-b border-theme-border px-4 lg:px-6 h-14 flex items-center justify-between transition-colors">
       {/* Left Branding & Breadcrumbs */}
       <div className="flex items-center gap-3">
         <button
           onClick={onToggleSidebar}
-          className="lg:hidden p-1.5 text-theme-muted hover:text-theme-main rounded-md hover:bg-theme-surface transition"
+          className="lg:hidden p-1.5 text-theme-muted hover:text-theme-main rounded-lg hover:bg-theme-surface-soft transition"
           aria-label="Toggle sidebar"
         >
           <Menu className="w-5 h-5" />
         </button>
 
-        <Link to="/" className="flex items-center gap-2 font-bold text-sm text-theme-main">
-          <div className="w-6.5 h-6.5 rounded-md bg-theme-primary text-white flex items-center justify-center font-extrabold text-xs">
+        <Link to="/dashboard" className="flex items-center gap-2 font-bold text-sm text-theme-main">
+          <div className="w-6.5 h-6.5 rounded-md bg-theme-primary text-white flex items-center justify-center font-extrabold text-xs shadow-xs">
             <Layers className="w-4 h-4" />
           </div>
           <span className="hidden sm:inline-block tracking-tight text-theme-main">Align</span>
@@ -120,8 +181,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
         <Search className="w-3.5 h-3.5 text-theme-muted absolute left-3 top-2.5" />
         <input
           type="text"
-          placeholder="Search workspace tasks, projects, members..."
-          className="w-full bg-theme-surface border border-theme-border rounded-md pl-9 pr-3 py-1.5 text-xs text-theme-main placeholder:text-theme-muted focus:outline-none focus:border-theme-primary transition"
+          value={globalSearch}
+          onChange={(e) => setGlobalSearch(e.target.value)}
+          onKeyDown={handleGlobalSearchKeyDown}
+          placeholder="Search people, teams, projects... (Press Enter)"
+          className="w-full bg-theme-surface-soft border border-theme-border-soft rounded-lg pl-9 pr-3 py-1.5 text-xs text-theme-main placeholder:text-theme-muted focus:outline-none focus:border-theme-primary focus:bg-theme-surface transition"
         />
       </div>
 
@@ -167,24 +231,42 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                 {notifications.length === 0 ? (
                   <div className="text-center py-6 text-theme-muted text-xs">No notifications</div>
                 ) : (
-                  notifications.map((n) => (
-                    <div
-                      key={n.id}
-                      onClick={() => handleMarkRead(n.id, n.link)}
-                      className={`p-2.5 rounded-lg border text-xs cursor-pointer transition ${
-                        n.is_read
-                          ? 'bg-theme-bg/60 border-theme-border text-theme-muted'
-                          : 'bg-theme-surface border-theme-border text-theme-main font-medium'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="font-semibold text-theme-main">{n.title}</span>
-                        <span className="text-[10px] text-theme-muted">{formatDateTime(n.created_at)}</span>
+                  notifications.map((n) => {
+                    const targetUrl = n.action_url || n.link;
+                    return (
+                      <div
+                        key={n.id}
+                        onClick={() => handleMarkRead(n.id, targetUrl)}
+                        className={`p-2.5 rounded-lg border text-xs cursor-pointer transition flex items-start gap-2.5 ${
+                          n.is_read
+                            ? 'bg-theme-bg/60 border-theme-border text-theme-muted'
+                            : 'bg-theme-surface border-theme-border text-theme-main font-medium shadow-xs'
+                        }`}
+                      >
+                        <div className="p-1.5 rounded-md bg-theme-bg border border-theme-border shrink-0 mt-0.5">
+                          {getNotificationIcon(n.type)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="font-semibold text-theme-main truncate">{n.title}</span>
+                            <span className="text-[10px] text-theme-muted shrink-0 ml-1">{formatDateTime(n.created_at)}</span>
+                          </div>
+                          <p className="text-[11px] text-theme-muted leading-snug line-clamp-2">{n.message}</p>
+                        </div>
                       </div>
-                      <p className="text-[11px] text-theme-muted leading-snug">{n.message}</p>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
+              </div>
+
+              <div className="border-t border-theme-border pt-2 mt-2 text-center">
+                <Link
+                  to="/notifications"
+                  onClick={() => setShowNotifications(false)}
+                  className="text-xs font-semibold text-theme-primary hover:underline inline-flex items-center gap-1"
+                >
+                  View All Notifications <ArrowRight className="w-3 h-3" />
+                </Link>
               </div>
             </div>
           )}

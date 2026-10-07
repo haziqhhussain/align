@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { DashboardLayout } from './layouts/DashboardLayout';
+import { LandingPage } from './pages/LandingPage';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
@@ -16,6 +17,13 @@ import { MyTasks } from './pages/MyTasks';
 import { Members } from './pages/Members';
 import { Profile } from './pages/Profile';
 import { UserManagement } from './pages/UserManagement';
+import { Connections } from './pages/Connections';
+import { Invitations } from './pages/Invitations';
+import { UserProfile } from './pages/UserProfile';
+import ActivityPage from './pages/Activity';
+import { Calendar } from './pages/Calendar';
+import { Analytics } from './pages/Analytics';
+import { NotificationsPage } from './pages/Notifications';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -47,7 +55,7 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }
 
   if (!user || !isAdmin) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -60,36 +68,43 @@ export const App: React.FC = () => {
         <AuthProvider>
           <ToastProvider>
             <Routes>
-              {/* Public Auth Routes */}
+              {/* Public Routes */}
+              <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
 
-              {/* Protected Dashboard Routes */}
+              {/* Protected Workspace Layout & Routes */}
               <Route
-                path="/"
                 element={
                   <ProtectedRoute>
                     <DashboardLayout />
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<Dashboard />} />
+                <Route path="/dashboard" element={<Dashboard />} />
                 <Route
-                  path="user-management"
+                  path="/user-management"
                   element={
                     <AdminRoute>
                       <UserManagement />
                     </AdminRoute>
                   }
                 />
-                <Route path="teams" element={<Teams />} />
-                <Route path="teams/:id" element={<TeamDetails />} />
-                <Route path="projects" element={<Projects />} />
-                <Route path="projects/:id" element={<ProjectDetails />} />
-                <Route path="tasks" element={<Tasks />} />
-                <Route path="my-tasks" element={<MyTasks />} />
-                <Route path="members" element={<Members />} />
-                <Route path="profile" element={<Profile />} />
+                <Route path="/teams" element={<Teams />} />
+                <Route path="/teams/:id" element={<TeamDetails />} />
+                <Route path="/connections" element={<Connections />} />
+                <Route path="/invitations" element={<Invitations />} />
+                <Route path="/projects" element={<Projects />} />
+                <Route path="/projects/:id" element={<ProjectDetails />} />
+                <Route path="/tasks" element={<Tasks />} />
+                <Route path="/my-tasks" element={<MyTasks />} />
+                <Route path="/calendar" element={<Calendar />} />
+                <Route path="/members" element={<Members />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
+                <Route path="/activity" element={<ActivityPage />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/users/:userId" element={<UserProfile />} />
+                <Route path="/profile" element={<Profile />} />
               </Route>
 
               {/* Catch-all fallback */}
@@ -101,4 +116,3 @@ export const App: React.FC = () => {
     </ThemeProvider>
   );
 };
-

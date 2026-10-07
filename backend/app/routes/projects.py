@@ -8,6 +8,8 @@ from app.models.project import Project
 from app.models.task import Task, TaskStatus
 from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
 from app.dependencies.auth import get_current_user, is_user_team_lead, is_user_team_member
+from app.services.notification_service import create_notification
+from app.services.activity_service import log_activity
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -81,6 +83,18 @@ def create_project(
     db.add(project)
     db.commit()
     db.refresh(project)
+
+    log_activity(
+        db=db,
+        actor_id=current_user.id,
+        action_type="PROJECT_CREATED",
+        entity_type="PROJECT",
+        entity_id=project.id,
+        team_id=project.team_id,
+        project_id=project.id,
+        description=f"{current_user.full_name} created project \"{project.name}\"."
+    )
+
     return format_project_response(project, db)
 
 @router.get("/{project_id}", response_model=ProjectResponse)
@@ -112,6 +126,8 @@ def update_project(
     if not is_user_team_lead(current_user, project.team_id, db):
         raise HTTPException(status_code=403, detail="Only Admin or Team Lead can edit project details")
 
+    old_status = project.status
+
     if project_in.name is not None:
         project.name = project_in.name
     if project_in.description is not None:
@@ -125,6 +141,49 @@ def update_project(
 
     db.commit()
     db.refresh(project)
+
+    # Logging status change vs general update
+    if project_in.status is not None and project_in.status != old_status:
+        old_val = old_status.value if hasattr(old_status, 'value') else str(old_status)
+        new_val = project.status.value if hasattr(project.status, 'value') else str(project.status)
+        log_activity(
+            db=db,
+            actor_id=current_user.id,
+            action_type="PROJECT_STATUS_CHANGED",
+            entity_type="PROJECT",
+            entity_id=project.id,
+            team_id=project.team_id,
+            project_id=project.id,
+            description=f"{current_user.full_name} changed \"{project.name}\" status from {old_val} to {new_val}.",
+            metadata={"field": "status", "old_value": old_val, "new_value": new_val}
+        )
+    else:
+        log_activity(
+            db=db,
+            actor_id=current_user.id,
+            action_type="PROJECT_UPDATED",
+            entity_type="PROJECT",
+            entity_id=project.id,
+            team_id=project.team_id,
+            project_id=project.id,
+            description=f"{current_user.full_name} updated project \"{project.name}\"."
+        )
+
+    # Notify team members about project update
+    team_members = db.query(TeamMember).filter(TeamMember.team_id == project.team_id).all()
+    for tm in team_members:
+        if tm.user_id != current_user.id:
+            create_notification(
+                db=db,
+                user_id=tm.user_id,
+                type="PROJECT_UPDATED",
+                title="Project Updated",
+                message=f"Project '{project.name}' was updated by {current_user.full_name}.",
+                related_entity_type="PROJECT",
+                related_entity_id=project.id,
+                action_url=f"/projects?id={project.id}"
+            )
+
     return format_project_response(project, db)
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -140,6 +199,21 @@ def delete_project(
     if not is_user_team_lead(current_user, project.team_id, db):
         raise HTTPException(status_code=403, detail="Only Admin or Team Lead can delete projects")
 
+    proj_name = project.name
+    team_id = project.team_id
+
     db.delete(project)
     db.commit()
+
+    log_activity(
+        db=db,
+        actor_id=current_user.id,
+        action_type="PROJECT_DELETED",
+        entity_type="PROJECT",
+        entity_id=project_id,
+        team_id=team_id,
+        project_id=project_id,
+        description=f"{current_user.full_name} deleted project \"{proj_name}\"."
+    )
+
     return None

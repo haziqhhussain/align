@@ -38,3 +38,5 @@ class Task(Base):
     assigned_to = relationship("User", back_populates="assigned_tasks", foreign_keys=[assigned_to_id])
     created_by = relationship("User", back_populates="created_tasks", foreign_keys=[created_by_id])
     comments = relationship("TaskComment", back_populates="task", cascade="all, delete-orphan")
+    subtasks = relationship("Subtask", back_populates="task", cascade="all, delete-orphan", order_by="Subtask.position")
+    attachments = relationship("Attachment", back_populates="task", cascade="all, delete-orphan")
